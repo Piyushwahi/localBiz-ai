@@ -23,7 +23,7 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      <div className="flex flex-col h-screen bg-cream-50 text-slate-900 overflow-hidden">
+      <div className="flex flex-col h-screen h-[100dvh] bg-cream-50 text-slate-900 overflow-hidden">
         <Navbar health={health} />
 
         <main className="flex-1 overflow-hidden bg-cream-50">

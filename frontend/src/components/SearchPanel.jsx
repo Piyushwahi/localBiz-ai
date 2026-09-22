@@ -175,7 +175,7 @@ export default function SearchPanel({ onAnalyze, onLocationSelect, status, onRes
   const currentStepIdx = AGENT_STEPS.findIndex(s => s.status === status)
 
   return (
-    <div className="w-[320px] min-w-[320px] max-w-[320px] flex-shrink-0 flex flex-col overflow-y-auto border-r border-slate-900/[0.08] bg-white">
+    <div className="w-full md:w-[320px] md:min-w-[320px] md:max-w-[320px] flex-shrink-0 flex flex-col overflow-y-auto md:border-r border-slate-900/[0.08] bg-white pb-20 md:pb-6">
 
       {/* ── Header ── */}
       <div className="px-5 pt-5 pb-4 border-b border-slate-900/[0.06] bg-cream-50/70">

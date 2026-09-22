@@ -11,7 +11,7 @@ import AgentStatus from '../components/AgentStatus'
 import CompareModal from '../components/CompareModal'
 import { useAnalysis } from '../hooks/useAnalysis'
 import { findAlternatives } from '../services/api'
-import { Loader2, GitCompare, PlusCircle, AlertCircle, Info, MapPin, Copy, Check, FileDown } from 'lucide-react'
+import { Loader2, GitCompare, PlusCircle, AlertCircle, Info, MapPin, Copy, Check, FileDown, Map as MapIcon, Search, Users, MessageSquare } from 'lucide-react'
 
 export default function MapAnalysis(props) {
   const localAnalysis = useAnalysis()
@@ -26,6 +26,7 @@ export default function MapAnalysis(props) {
     reset = localAnalysis.reset,
   } = props?.runAnalysis ? props : localAnalysis
 
+  const [mobileTab, setMobileTab] = useState('map') // 'map' | 'search' | 'candidates' | 'debate'
   const [homeCoords, setHomeCoords] = useState(null)
   const [radius, setRadius] = useState(2.0)
   const [selectedCandidate, setSelectedCandidate] = useState(null)
@@ -46,6 +47,7 @@ export default function MapAnalysis(props) {
     runAnalysis(payload)
     setAlternatives([])
     setSelectedCandidate(null)
+    setMobileTab('map')
   }, [runAnalysis])
 
   const handleLocationSelect = useCallback((coords) => {
@@ -118,7 +120,46 @@ ${finalReport?.responsible_ai_notice || 'Evidence-based decision support only. P
 
   return (
     <div className="flex flex-col h-full bg-cream-50">
-      <div className="flex flex-1 overflow-hidden">
+      {/* Mobile Mode Switcher Bar */}
+      <div className="md:hidden flex items-center justify-between bg-white border-b border-slate-900/[0.08] px-2 py-1.5 flex-shrink-0 shadow-xs z-30">
+        <div className="grid grid-cols-4 w-full gap-1 bg-cream-100 p-1 rounded-xl">
+          <button
+            onClick={() => setMobileTab('map')}
+            className={`flex items-center justify-center gap-1 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              mobileTab === 'map' ? 'bg-white text-navy-900 shadow-xs' : 'text-slate-500'
+            }`}
+          >
+            <MapIcon size={12} /> Map
+          </button>
+          <button
+            onClick={() => setMobileTab('search')}
+            className={`flex items-center justify-center gap-1 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              mobileTab === 'search' ? 'bg-white text-navy-900 shadow-xs' : 'text-slate-500'
+            }`}
+          >
+            <Search size={12} /> Search
+          </button>
+          <button
+            onClick={() => setMobileTab('candidates')}
+            className={`flex items-center justify-center gap-1 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              mobileTab === 'candidates' ? 'bg-white text-navy-900 shadow-xs' : 'text-slate-500'
+            }`}
+          >
+            <Users size={12} /> Areas {allCandidates.length > 0 && `(${allCandidates.length})`}
+          </button>
+          <button
+            onClick={() => setMobileTab('debate')}
+            className={`flex items-center justify-center gap-1 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              mobileTab === 'debate' ? 'bg-white text-navy-900 shadow-xs' : 'text-slate-500'
+            }`}
+          >
+            <MessageSquare size={12} /> Debate
+          </button>
+        </div>
+      </div>
+
+      {/* ── DESKTOP VIEW (3 Column Layout) ── */}
+      <div className="hidden md:flex flex-1 overflow-hidden">
         {/* LEFT: Search panel */}
         <SearchPanel
           onAnalyze={handleAnalyze}
@@ -256,6 +297,148 @@ ${finalReport?.responsible_ai_notice || 'Evidence-based decision support only. P
             )}
           </div>
         </div>
+      </div>
+
+      {/* ── MOBILE VIEW (Tabbed / Screen Optimized) ── */}
+      <div className="flex md:hidden flex-1 overflow-hidden pb-14">
+        {mobileTab === 'map' && (
+          <div className="flex-1 flex flex-col relative h-full">
+            <div className="flex-1 relative">
+              <MapView
+                homeCoords={homeCoords || (analysisData?.home_coordinates ? {
+                  latitude: analysisData.home_coordinates.latitude,
+                  longitude: analysisData.home_coordinates.longitude,
+                } : null)}
+                radius={radius}
+                pois={pois}
+                candidates={allCandidates}
+                selectedCandidate={selectedCandidate}
+                onCandidateSelect={setSelectedCandidate}
+                onMapClick={handleMapClick}
+              />
+
+              {/* Floating Quick Action Drawer on Map */}
+              <div className="absolute top-3 left-3 right-3 z-30 pointer-events-none flex flex-col gap-2">
+                {isRunning && (
+                  <div className="pointer-events-auto bg-white/95 backdrop-blur-md border border-slate-900/[0.1] rounded-xl p-2.5 shadow-md flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Loader2 size={16} className="animate-spin text-primary-600" />
+                      <span className="text-xs font-bold text-navy-900">
+                        {status === 'maps_fetching' ? 'Fetching Azure Maps...'
+                          : status === 'generating_candidates' ? 'Finding Candidate Areas...'
+                          : status === 'debating' ? 'Agents Debating...'
+                          : 'Processing...'}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => setMobileTab('debate')}
+                      className="text-[11px] font-bold text-primary-700 bg-primary-50 px-2 py-0.5 rounded-lg border border-primary-200"
+                    >
+                      View Live
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Bottom Map Quick Action Buttons */}
+              <div className="absolute bottom-16 left-3 right-3 z-30 flex gap-2">
+                <button
+                  onClick={() => setMobileTab('search')}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 bg-white/95 backdrop-blur-md border border-slate-900/[0.1] rounded-xl text-xs font-bold text-navy-900 shadow-md active:scale-95 transition-transform"
+                >
+                  <Search size={14} className="text-primary-600" /> Search Place
+                </button>
+                {allCandidates.length > 0 && (
+                  <button
+                    onClick={() => setMobileTab('candidates')}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 bg-primary-600 text-white rounded-xl text-xs font-bold shadow-md shadow-primary-600/30 active:scale-95 transition-transform"
+                  >
+                    <Users size={14} /> {allCandidates.length} Areas
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {mobileTab === 'search' && (
+          <div className="flex-1 overflow-y-auto w-full bg-white">
+            <SearchPanel
+              onAnalyze={handleAnalyze}
+              onLocationSelect={handleLocationSelect}
+              status={status}
+              onReset={reset}
+            />
+          </div>
+        )}
+
+        {mobileTab === 'candidates' && (
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#faf8f5] w-full">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+              <h3 className="text-sm font-bold text-navy-900">
+                Candidate Areas ({allCandidates.length})
+              </h3>
+              <div className="flex gap-1.5">
+                <button
+                  onClick={handleCopyFullReport}
+                  className="btn-secondary text-xs py-1 px-2.5 font-bold"
+                >
+                  {copiedReport ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
+                  {copiedReport ? 'Copied' : 'Export'}
+                </button>
+                {allCandidates.length >= 2 && (
+                  <button
+                    onClick={() => setShowCompare(true)}
+                    className="btn-secondary text-xs py-1 px-2.5"
+                  >
+                    <GitCompare size={12} /> Compare
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {allCandidates.length === 0 ? (
+              <div className="text-center py-16 text-slate-400">
+                <Users size={36} className="mx-auto mb-2 opacity-40 text-primary-600" />
+                <p className="text-sm font-semibold text-navy-900">No Candidates Yet</p>
+                <p className="text-xs text-slate-500 mt-1">Start an analysis in the Search tab to view candidates</p>
+                <button
+                  onClick={() => setMobileTab('search')}
+                  className="mt-4 btn-primary text-xs py-2 px-4"
+                >
+                  Go to Search
+                </button>
+              </div>
+            ) : (
+              allCandidates.map((cand, i) => (
+                <CandidateCard
+                  key={cand.id}
+                  candidate={cand}
+                  report={candidateReports[cand.id]}
+                  debateData={debateData}
+                  index={i}
+                  isSelected={selectedCandidate?.id === cand.id}
+                  onSelect={() => setSelectedCandidate(cand)}
+                  isRecommended={cand.id === bestId}
+                />
+              ))
+            )}
+          </div>
+        )}
+
+        {mobileTab === 'debate' && (
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-white w-full">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+              <h3 className="text-sm font-bold text-navy-900">Multi-Agent Debate</h3>
+              {debateData && (
+                <span className="text-[11px] text-primary-700 font-bold bg-primary-50 px-2 py-0.5 rounded-full border border-primary-200">
+                  {debateData.events?.length || 0} events
+                </span>
+              )}
+            </div>
+            <DebateTimeline debateData={debateData} compact={false} />
+          </div>
+        )}
       </div>
 
       {/* Compare modal */}
