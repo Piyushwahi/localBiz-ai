@@ -54,12 +54,17 @@ export function useAnalysis() {
     }
   }, [])
 
+  const notFoundRetriesRef = useRef(0)
+
   const poll = useCallback(async (id) => {
     try {
       const [statusData, debData] = await Promise.all([
         getAnalysisStatus(id),
         getDebate(id).catch(() => null),
       ])
+
+      // Reset retry count on any successful response
+      notFoundRetriesRef.current = 0
 
       if (debData) setDebateData(debData)
 
@@ -81,6 +86,11 @@ export function useAnalysis() {
         setStatus(statusData.status)
       }
     } catch (e) {
+      if (e?.response?.status === 404 && notFoundRetriesRef.current < 4) {
+        notFoundRetriesRef.current += 1
+        console.warn(`Analysis not found on attempt ${notFoundRetriesRef.current}, retrying...`)
+        return
+      }
       stopPolling()
       setError(getErrorMessage(e))
       setStatus('error')
@@ -89,6 +99,7 @@ export function useAnalysis() {
 
   const runAnalysis = useCallback(async (payload) => {
     stopPolling()
+    notFoundRetriesRef.current = 0
     setError(null)
     setAnalysisData(null)
     setCandidates([])
@@ -99,8 +110,17 @@ export function useAnalysis() {
       const result = await startAnalysis(payload)
       const id = result.analysis_id
       setAnalysisId(id)
-      setStatus('polling')
 
+      // Fast-path: Backend completed full analysis synchronously
+      if (result.status === 'complete' && result.candidates?.length) {
+        setAnalysisData(result)
+        setCandidates(result.candidates || [])
+        if (result.debate) setDebateData(result.debate)
+        setStatus('complete')
+        return id
+      }
+
+      setStatus('polling')
       pollRef.current = setInterval(() => poll(id), POLL_INTERVAL)
       poll(id)
 

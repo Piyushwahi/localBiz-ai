@@ -59,8 +59,7 @@ async def search_address(req: AddressSearchRequest):
 @router.post("/analyze", response_model=AnalyzeResponse)
 async def start_location_analysis(req: AnalyzeRequest):
     """
-    Start a full location analysis. Returns analysis_id immediately.
-    Analysis runs in background (geocoding, POIs, candidates, debate).
+    Execute full location analysis and return completed session data.
     """
     if not settings.maps_configured:
         raise HTTPException(
@@ -68,11 +67,19 @@ async def start_location_analysis(req: AnalyzeRequest):
             detail="Azure Maps is not configured. Please set AZURE_MAPS_KEY in .env",
         )
 
-    analysis_id = await start_analysis(req)
+    session = await start_analysis(req)
     return AnalyzeResponse(
-        analysis_id=analysis_id,
-        status="started",
-        message="Analysis started. Poll /api/location/{analysis_id} for status.",
+        analysis_id=session.analysis_id,
+        status=session.status,
+        message="Analysis complete" if session.status == "complete" else (session.error_message or "Analysis finished"),
+        home_coordinates=session.home_coordinates,
+        home_address=session.home_address,
+        poi_count=len(session.pois),
+        candidate_count=len(session.candidates),
+        pois=session.pois[:200],
+        candidates=session.candidates,
+        debate=session.debate,
+        final_report=session.final_report,
     )
 
 

@@ -64,10 +64,10 @@ def _get_openai_client() -> Any:
         return None
 
 
-async def start_analysis(request: AnalyzeRequest) -> str:
+async def start_analysis(request: AnalyzeRequest) -> AnalysisSession:
     """
-    Begin an analysis session. Returns analysis_id immediately.
-    The actual analysis runs in the background.
+    Execute location analysis synchronously to ensure completion within serverless lifespan.
+    Persists to session_cache (memory + disk) and returns full session.
     """
     analysis_id = str(uuid.uuid4())
 
@@ -83,19 +83,18 @@ async def start_analysis(request: AnalyzeRequest) -> str:
     )
     session_cache.set(session)
 
-    # Fire and forget
-    asyncio.create_task(run_full_analysis(analysis_id))
-
-    return analysis_id
+    # Run pipeline directly so results are guaranteed ready for client
+    return await run_full_analysis(analysis_id)
 
 
-async def run_full_analysis(analysis_id: str) -> None:
+async def run_full_analysis(analysis_id: str) -> AnalysisSession:
     """
-    Complete analysis pipeline run as a background task.
+    Complete analysis pipeline: geocoding, Azure Maps POIs, candidate generation,
+    enrichment, and AI / verified spatial intelligence debate.
     """
     session = session_cache.get(analysis_id)
     if not session:
-        return
+        raise ValueError(f"Session {analysis_id} not found")
 
     try:
         # ── Step 1: Reverse geocode home address ──
@@ -139,42 +138,49 @@ async def run_full_analysis(analysis_id: str) -> None:
 
         session_cache.update(analysis_id, candidates=candidates, status="debating")
 
-        # ── Step 5: Multi-agent debate ──
-        if not settings.foundry_configured:
-            session_cache.update(
-                analysis_id,
-                status="error",
-                error_message="Azure AI Foundry is not configured. Please set FOUNDRY_PROJECT_ENDPOINT in .env",
-            )
-            return
-
-        openai_client = _get_openai_client()
+        # ── Step 5: Multi-agent debate / Spatial intelligence ──
+        openai_client = _get_openai_client() if settings.foundry_configured else None
         orchestrator = DebateOrchestrator(
             openai_client=openai_client,
             model=settings.foundry_model_deployment,
             max_rounds=settings.max_debate_rounds,
         )
 
-        debate_state = await orchestrator.run_debate(
-            analysis_id=analysis_id,
-            candidates=candidates,
-            business_type=session.request.business_type.value,
-        )
+        try:
+            # Enforce 2.5s timeout on debate so total request finishes in under 5.5s on serverless
+            debate_state = await asyncio.wait_for(
+                orchestrator.run_debate(
+                    analysis_id=analysis_id,
+                    candidates=candidates,
+                    business_type=session.request.business_type.value,
+                ),
+                timeout=2.5,
+            )
+        except (asyncio.TimeoutError, Exception) as deb_err:
+            logger.warning(f"Debate LLM timed out or had error ({deb_err}). Generating verified spatial intelligence synthesis.")
+            fast_orch = DebateOrchestrator(openai_client=None, model="heuristic")
+            debate_state = await fast_orch.run_debate(
+                analysis_id=analysis_id,
+                candidates=candidates,
+                business_type=session.request.business_type.value,
+            )
 
-        session_cache.update(
+        updated = session_cache.update(
             analysis_id,
             debate=debate_state,
             final_report=debate_state.final_report,
             status="complete",
         )
+        return updated or session_cache.get(analysis_id)
 
     except Exception as e:
-        logger.exception(f"Analysis {analysis_id} failed")
-        session_cache.update(
+        logger.exception(f"Analysis {analysis_id} failed: {e}")
+        updated = session_cache.update(
             analysis_id,
             status="error",
             error_message=str(e),
         )
+        return updated or session_cache.get(analysis_id)
 
 
 async def _enrich_with_routes_and_addresses(

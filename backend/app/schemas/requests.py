@@ -260,6 +260,14 @@ class AnalyzeResponse(BaseModel):
     analysis_id: str
     status: str
     message: str
+    home_coordinates: Optional[Coordinates] = None
+    home_address: Optional[str] = None
+    poi_count: int = 0
+    candidate_count: int = 0
+    pois: List[POI] = Field(default_factory=list)
+    candidates: List[Candidate] = Field(default_factory=list)
+    debate: Optional[DebateState] = None
+    final_report: Optional[FinalReport] = None
 
 
 class HealthResponse(BaseModel):
