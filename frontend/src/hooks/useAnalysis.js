@@ -39,12 +39,18 @@ export function useAnalysis() {
       return h
     } catch (err) {
       console.error('Failed to fetch backend health:', err)
+      const errorDetail =
+        err?.response?.data?.detail ||
+        (err?.message === 'Network Error'
+          ? 'Network Error — Backend unreachable or CORS origin blocked'
+          : err?.message || 'Unable to connect to backend')
       setHealth({
         status: 'unreachable',
         azure_maps_configured: false,
         foundry_configured: false,
-        error: err?.message || 'Unable to connect to backend',
+        error: errorDetail,
       })
+      return null
     }
   }, [])
 

@@ -6,8 +6,11 @@
 
 import axios from 'axios'
 
-const envUrl = import.meta.env.VITE_API_URL
-const baseURL = envUrl ? `${envUrl.replace(/\/$/, '')}/api` : '/api'
+const rawEnvUrl = (import.meta.env.VITE_API_URL || '').trim()
+const sanitizedEnvUrl = rawEnvUrl.replace(/\/+$/, '')
+const baseURL = sanitizedEnvUrl
+  ? (sanitizedEnvUrl.endsWith('/api') ? sanitizedEnvUrl : `${sanitizedEnvUrl}/api`)
+  : '/api'
 
 const api = axios.create({
   baseURL,
@@ -15,10 +18,40 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 })
 
+// Request logging for diagnostics (no secrets exposed)
+api.interceptors.request.use(
+  (config) => {
+    if (import.meta.env.DEV) {
+      console.log(`[API Request] ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`)
+    }
+    return config
+  },
+  (error) => Promise.reject(error)
+)
+
+// Response error logging for diagnostics (diagnose Network Error / CORS issues)
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const targetUrl = error.config
+      ? `${error.config.baseURL || ''}${error.config.url || ''}`
+      : 'unknown'
+    console.error(`[API Network Error] ${error.config?.method?.toUpperCase() || 'GET'} ${targetUrl}:`, {
+      message: error.message,
+      code: error.code,
+      status: error.response?.status,
+      detail: error.response?.data?.detail,
+    })
+    return Promise.reject(error)
+  }
+)
+
 // ── Health ──────────────────────────────────────
 export const checkHealth = () => api.get('/health').then(r => r.data)
 
-// ── Location / Geocoding ────────────────────────
+// ── Location / Geocoding / Maps Key ─────────────
+export const getMapsKey = () => api.get('/location/maps-key').then(r => r.data)
+
 export const searchAddress = (address) =>
   api.post('/location/search', { address }).then(r => r.data)
 

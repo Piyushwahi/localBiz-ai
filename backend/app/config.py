@@ -37,7 +37,13 @@ class Settings(BaseSettings):
 
     # App settings
     cors_origins: List[str] = Field(
-        default=["http://localhost:5173", "http://localhost:3000"],
+        default=[
+            "http://localhost:5173",
+            "http://localhost:3000",
+            "http://127.0.0.1:5173",
+            "http://127.0.0.1:3000",
+            "https://frontend-theta-plum-71.vercel.app",
+        ],
         alias="CORS_ORIGINS",
     )
     demo_mode: bool = Field(default=False, alias="DEMO_MODE")
@@ -49,9 +55,29 @@ class Settings(BaseSettings):
     @field_validator("cors_origins", mode="before")
     @classmethod
     def parse_cors(cls, v):
+        base_origins = [
+            "http://localhost:5173",
+            "http://localhost:3000",
+            "http://127.0.0.1:5173",
+            "http://127.0.0.1:3000",
+            "https://frontend-theta-plum-71.vercel.app",
+        ]
         if isinstance(v, str):
-            return [o.strip() for o in v.split(",")]
-        return v
+            cleaned = v.strip().strip("'\"")
+            if cleaned == "*":
+                return base_origins
+            parsed = [o.strip().rstrip("/") for o in cleaned.split(",") if o.strip() and o.strip() != "*"]
+            for origin in base_origins:
+                if origin not in parsed:
+                    parsed.append(origin)
+            return parsed
+        elif isinstance(v, list):
+            parsed = [str(o).strip().rstrip("/") for o in v if str(o).strip() and str(o).strip() != "*"]
+            for origin in base_origins:
+                if origin not in parsed:
+                    parsed.append(origin)
+            return parsed
+        return base_origins
 
     @property
     def azure_configured(self) -> bool:

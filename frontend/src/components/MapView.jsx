@@ -11,7 +11,7 @@
  *   - Category toggle bar
  */
 import { useEffect, useRef, useState, useCallback } from 'react'
-import api from '../services/api'
+import { getMapsKey } from '../services/api'
 
 const CATEGORY_COLORS = {
   restaurant: '#f97316',
@@ -70,18 +70,19 @@ export default function MapView({
   useEffect(() => {
     let cancelled = false
     const fetchKey = () => {
-      api.get('/location/maps-key')
-        .then(r => {
+      getMapsKey()
+        .then(data => {
           if (cancelled) return
-          if (r.data.key) {
-            setMapsKey(r.data.key)
+          if (data?.key) {
+            setMapsKey(data.key)
             setKeyError(false)
           } else {
             setKeyError(true)
           }
         })
-        .catch(() => {
+        .catch((err) => {
           if (cancelled) return
+          console.error('Failed to load Azure Maps key:', err?.message || err)
           setKeyError(true)
         })
     }
