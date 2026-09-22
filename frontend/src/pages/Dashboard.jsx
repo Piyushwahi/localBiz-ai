@@ -26,6 +26,8 @@ function MetricCard({ icon: Icon, label, value, sublabel, iconColor = 'text-prim
 
 export default function Dashboard({ analysisData, debateData, status, health }) {
   const navigate = useNavigate()
+  const isChecking = !health
+  const isUnreachable = health?.status === 'unreachable'
   const configured = health?.azure_maps_configured && health?.foundry_configured
 
   const pois = analysisData?.pois || []
@@ -67,8 +69,18 @@ export default function Dashboard({ analysisData, debateData, status, health }) 
             Rigorous cross-validation, competitive intelligence, and verifiable reasoning for enterprise site selection.
           </p>
 
-          {/* Config Alert if missing */}
-          {!configured && (
+          {/* Connection Error Alert if unreachable */}
+          {!isChecking && isUnreachable && (
+            <div className="mt-4 flex items-center gap-2.5 bg-red-50 border border-red-200 rounded-xl p-3.5 max-w-2xl">
+              <AlertTriangle size={16} className="text-red-600 flex-shrink-0" />
+              <p className="text-xs text-red-800">
+                ⚠ Unable to reach backend API ({health?.error || 'Check CORS or VITE_API_URL'}). Live data may be unavailable.
+              </p>
+            </div>
+          )}
+
+          {/* Config Alert if backend is reachable but keys are missing */}
+          {!isChecking && !isUnreachable && !configured && (
             <div className="mt-4 flex items-center gap-2.5 bg-amber-50 border border-amber-200 rounded-xl p-3.5 max-w-2xl">
               <AlertTriangle size={16} className="text-amber-600 flex-shrink-0" />
               <p className="text-xs text-amber-800">

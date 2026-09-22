@@ -37,8 +37,14 @@ export function useAnalysis() {
       const h = await checkHealth()
       setHealth(h)
       return h
-    } catch {
-      setHealth({ status: 'error', azure_maps_configured: false, foundry_configured: false })
+    } catch (err) {
+      console.error('Failed to fetch backend health:', err)
+      setHealth({
+        status: 'unreachable',
+        azure_maps_configured: false,
+        foundry_configured: false,
+        error: err?.message || 'Unable to connect to backend',
+      })
     }
   }, [])
 

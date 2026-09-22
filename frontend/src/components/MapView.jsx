@@ -11,8 +11,7 @@
  *   - Category toggle bar
  */
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { checkHealth } from '../services/api'
-import axios from 'axios'
+import api from '../services/api'
 
 const CATEGORY_COLORS = {
   restaurant: '#f97316',
@@ -71,7 +70,7 @@ export default function MapView({
   useEffect(() => {
     let cancelled = false
     const fetchKey = () => {
-      axios.get('/api/location/maps-key')
+      api.get('/location/maps-key')
         .then(r => {
           if (cancelled) return
           if (r.data.key) {
